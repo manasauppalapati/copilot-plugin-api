@@ -1,0 +1,39 @@
+{
+  "AzureOpenAI": {
+    "Endpoint": "<your-azure-openai-endpoint>",
+    "ApiKey": "<your-azure-openai-api-key>",
+    "PrimaryDeployment": "gpt-4o",
+    "FallbackDeployment": "gpt-35-turbo",
+    "MaxRetries": 3
+  },
+  "Prompt": {
+    "SystemPrompt": "You are a Copilot-style assistant. Answer accurately, concisely, and with attention to the conversation context."
+  },
+  "Redis": {
+    "ConnectionString": "localhost:6379"
+  },
+  "Memory": {
+    "MaxTurns": 20,
+    "TtlHours": 24,
+    "TokenBudget": 3000
+  },
+  "SemanticCache": {
+    "TtlHours": 1
+  },
+  "RateLimit": {
+    "RequestsPerMinute": 100
+  },
+  "Costs": {
+    "Gpt4oInputPerThousand": 0.005,
+    "Gpt4oOutputPerThousand": 0.015,
+    "Gpt35InputPerThousand": 0.0005,
+    "Gpt35OutputPerThousand": 0.0015
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Debug",
+      "Microsoft.AspNetCore": "Warning",
+      "Microsoft.EntityFrameworkCore": "Information"
+    }
+  }
+}
