@@ -44,8 +44,20 @@ builder.Services
     .ValidateOnStart();
 
 builder.Services
+    .AddOptions<PromptConfig>()
+    .BindConfiguration(PromptConfig.SectionName)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services
     .AddOptions<MemoryConfig>()
     .BindConfiguration(MemoryConfig.SectionName)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services
+    .AddOptions<SemanticCacheConfig>()
+    .BindConfiguration(SemanticCacheConfig.SectionName)
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
@@ -96,6 +108,8 @@ builder.Services.AddSingleton<Tokenizer>(_ => TiktokenTokenizer.CreateForModel(T
 builder.Services.AddSingleton<IRateLimiterService, RateLimiterService>();
 builder.Services.AddSingleton<IIdempotencyService, IdempotencyService>();
 builder.Services.AddScoped<IMemoryService, MemoryService>();
+builder.Services.AddScoped<ISemanticCacheService, SemanticCacheService>();
+builder.Services.AddSingleton<IPromptBuilderService, PromptBuilderService>();
 
 // Controllers
 builder.Services.AddControllers();

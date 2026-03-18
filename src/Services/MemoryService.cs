@@ -36,6 +36,14 @@ public interface IMemoryService
     /// <param name="ct">The cancellation token for the operation.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
     Task ClearAsync(string sessionId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Removes the oldest conversation turns until the remaining history fits within the supplied token budget.
+    /// </summary>
+    /// <param name="history">The conversation history ordered from oldest to newest.</param>
+    /// <param name="tokenBudget">The maximum number of tokens permitted for the returned history.</param>
+    /// <returns>The newest suffix of <paramref name="history" /> that fits within <paramref name="tokenBudget" />.</returns>
+    IReadOnlyList<ConversationTurn> TrimToTokenBudget(IReadOnlyList<ConversationTurn> history, int tokenBudget);
 }
 
 /// <summary>
@@ -53,7 +61,6 @@ public sealed class MemoryService(
 {
     private const string RedisKeyPrefix = "session:";
     private const string RedisKeySuffix = ":history";
-    private const string TokenCountSeparator = "\n";
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IDatabase database = connectionMultiplexer.GetDatabase();
@@ -193,59 +200,7 @@ public sealed class MemoryService(
     /// <param name="tokenBudget">The maximum number of tokens permitted for the returned history.</param>
     /// <returns>The newest suffix of <paramref name="history" /> that fits within <paramref name="tokenBudget" />.</returns>
     public IReadOnlyList<ConversationTurn> TrimToTokenBudget(IReadOnlyList<ConversationTurn> history, int tokenBudget)
-    {
-        ArgumentNullException.ThrowIfNull(history);
-
-        if (tokenBudget < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(tokenBudget), tokenBudget, "The token budget must be zero or greater.");
-        }
-
-        if (history.Count == 0 || tokenBudget == 0)
-        {
-            return Array.Empty<ConversationTurn>();
-        }
-
-        var tokenCounts = new int[history.Count];
-        long totalTokens = 0;
-
-        for (var i = 0; i < history.Count; i++)
-        {
-            var turn = history[i] ?? throw new InvalidOperationException("Conversation history cannot contain null turns.");
-            var tokenCount = CountTokens(turn);
-
-            tokenCounts[i] = tokenCount;
-            totalTokens += tokenCount;
-        }
-
-        if (totalTokens <= tokenBudget)
-        {
-            return history;
-        }
-
-        var startIndex = 0;
-        while (startIndex < history.Count && totalTokens > tokenBudget)
-        {
-            totalTokens -= tokenCounts[startIndex];
-            startIndex++;
-        }
-
-        if (startIndex >= history.Count)
-        {
-            return Array.Empty<ConversationTurn>();
-        }
-
-        var trimmedHistory = new ConversationTurn[history.Count - startIndex];
-        for (var i = startIndex; i < history.Count; i++)
-        {
-            trimmedHistory[i - startIndex] = history[i];
-        }
-
-        return trimmedHistory;
-    }
-
-    private int CountTokens(ConversationTurn turn) =>
-        historyTokenizer.CountTokens($"{turn.Role}{TokenCountSeparator}{turn.Content}");
+        => PromptTokenCalculator.TrimToTokenBudget(historyTokenizer, history, tokenBudget);
 
     private static RedisKey BuildRedisKey(string sessionId) =>
         $"{RedisKeyPrefix}{{{sessionId}}}{RedisKeySuffix}";
