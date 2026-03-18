@@ -10,18 +10,26 @@ A production-grade Copilot-style conversational API built in C# / .NET 8 with Az
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 ## Architecture Overview
-```text
-Client
-  -> Rate Limiter
-  -> Idempotency Check
-  -> Controller
-  -> Memory Service
-  -> Semantic Cache
-  -> Prompt Builder
-  -> LLM Orchestrator
-  -> Azure OpenAI
-  -> Response Formatter
-  -> Audit Logger
+```mermaid
+   flowchart TD
+       A[Client<br/>POST /api/chat] --> B[Rate Limiter<br/>Redis token bucket · 100 req/min]
+       B -->|429 if exceeded| Z1[HTTP 429]
+       B --> C[Idempotency Check<br/>SHA-256 key · 60s TTL]
+       C -->|duplicate requestId| Z2[Return cached response]
+       C --> D[CopilotController<br/>Validates input · orchestrates pipeline]
+       D -->|invalid input| Z3[HTTP 400]
+       D --> E[Memory Service<br/>Last 20 turns · 24h TTL · token trimmed]
+       D --> F[Semantic Cache<br/>Redis hash lookup]
+       F -->|cache hit| Z4[Return cached response · skip LLM]
+       F --> G[Prompt Builder<br/>System + history + query · token budget enforced]
+       G --> H[LLM Orchestrator<br/>Retry + exponential backoff · graceful degradation]
+       H -->|GPT-4o healthy| I[Azure OpenAI GPT-4o]
+       H -->|GPT-4o throttled| J[Azure OpenAI GPT-3.5-turbo<br/>~10x cheaper fallback]
+       H -->|both fail| Z5[degraded: true · partial response]
+       I --> K[Response Formatter<br/>SSE streaming · JSON fallback]
+       J --> K
+       K --> L[Audit Logger<br/>SQL · tokens · latency · cost estimate]
+       L --> M[Client receives response]
 ```
 
 ## Key Design Decisions
@@ -61,7 +69,9 @@ Client
    ```bash
    cp appsettings.Development.json.example appsettings.Development.json
    ```
-3. Fill in `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_ENDPOINT`.
+3. Open appsettings.Development.json and populate the following fields:
+   AZURE_OPENAI_API_KEY — your Azure OpenAI API key
+   AZURE_OPENAI_ENDPOINT — your Azure OpenAI resource endpoint URI
 4. Start Redis and PostgreSQL.
    ```bash
    docker-compose up -d
@@ -105,6 +115,12 @@ Rate limit response:
 ```http
 HTTP/1.1 429 Too Many Requests
 Retry-After: 60
+Content-Type: application/json
+
+{
+  "error": "Rate limit exceeded",
+  "retryAfterSeconds": 60
+}
 ```
 
 ## Environment Variables
