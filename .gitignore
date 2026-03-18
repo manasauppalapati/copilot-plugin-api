@@ -7,6 +7,12 @@
 appsettings.Development.json
 appsettings.Production.json
 .env
+.env.local
+
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
 
 # User-specific files
 *.rsuser
@@ -14,7 +20,6 @@ appsettings.Production.json
 *.user
 *.userosscache
 *.sln.docstates
-*.env
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs

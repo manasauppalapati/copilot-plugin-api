@@ -300,9 +300,9 @@ public sealed class LlmOrchestratorService(
         var (inputRate, outputRate) = modelUsed switch
         {
             var value when value.Equals(openAIConfig.PrimaryDeployment, StringComparison.OrdinalIgnoreCase) =>
-                (pricingConfig.Gpt4oInputPerThousand, pricingConfig.Gpt4oOutputPerThousand),
+                (pricingConfig.PrimaryInputPerThousand, pricingConfig.PrimaryOutputPerThousand),
             var value when value.Equals(openAIConfig.FallbackDeployment, StringComparison.OrdinalIgnoreCase) =>
-                (pricingConfig.Gpt35InputPerThousand, pricingConfig.Gpt35OutputPerThousand),
+                (pricingConfig.FallbackInputPerThousand, pricingConfig.FallbackOutputPerThousand),
             _ => (0D, 0D)
         };
 

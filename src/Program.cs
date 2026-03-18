@@ -14,6 +14,8 @@ using Microsoft.ML.Tokenizers;
 using Microsoft.OpenApi.Models;
 using StackExchange.Redis;
 
+DotNetEnv.Env.Load();
+
 // ── 1. Builder ──────────────────────────────────────────────────
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,28 +34,7 @@ if (!File.Exists(localAppSettingsPath) && File.Exists(repositoryAppSettingsPath)
             reloadOnChange: true);
 }
 
-var azureOpenAIEnvironmentOverrides = new Dictionary<string, string?>();
-var azureOpenAIEndpointEnvironmentValue =
-    Environment.GetEnvironmentVariable(AzureOpenAIEnvironmentVariableNames.Endpoint);
-var azureOpenAIApiKeyEnvironmentValue =
-    Environment.GetEnvironmentVariable(AzureOpenAIEnvironmentVariableNames.ApiKey);
-
-if (!string.IsNullOrWhiteSpace(azureOpenAIEndpointEnvironmentValue))
-{
-    azureOpenAIEnvironmentOverrides[$"{AzureOpenAIConfig.SectionName}:{nameof(AzureOpenAIConfig.Endpoint)}"] =
-        azureOpenAIEndpointEnvironmentValue;
-}
-
-if (!string.IsNullOrWhiteSpace(azureOpenAIApiKeyEnvironmentValue))
-{
-    azureOpenAIEnvironmentOverrides[$"{AzureOpenAIConfig.SectionName}:{nameof(AzureOpenAIConfig.ApiKey)}"] =
-        azureOpenAIApiKeyEnvironmentValue;
-}
-
-if (azureOpenAIEnvironmentOverrides.Count > 0)
-{
-    builder.Configuration.AddInMemoryCollection(azureOpenAIEnvironmentOverrides);
-}
+builder.Configuration.AddEnvironmentVariables();
 
 // ── 2. Configuration ────────────────────────────────────────────
 builder.Services
@@ -297,12 +278,6 @@ internal static class DatabaseEnvironmentVariableNames
 {
     internal const string Provider = "DATABASE_PROVIDER";
     internal const string ConnectionString = "DATABASE_CONNECTION_STRING";
-}
-
-internal static class AzureOpenAIEnvironmentVariableNames
-{
-    internal const string Endpoint = "AZURE_OPENAI_ENDPOINT";
-    internal const string ApiKey = "AZURE_OPENAI_API_KEY";
 }
 
 internal static class DatabaseProviderResolver

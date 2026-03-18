@@ -13,26 +13,26 @@ public sealed class CostsConfig
     public const string SectionName = "Costs";
 
     /// <summary>
-    /// Gets or sets the GPT-4o input price per thousand prompt tokens in USD.
+    /// Gets or sets the primary deployment input price per thousand prompt tokens in USD.
     /// </summary>
     [Range(0D, double.MaxValue)]
-    public double Gpt4oInputPerThousand { get; set; }
+    public double PrimaryInputPerThousand { get; set; }
 
     /// <summary>
-    /// Gets or sets the GPT-4o output price per thousand completion tokens in USD.
+    /// Gets or sets the primary deployment output price per thousand completion tokens in USD.
     /// </summary>
     [Range(0D, double.MaxValue)]
-    public double Gpt4oOutputPerThousand { get; set; }
+    public double PrimaryOutputPerThousand { get; set; }
 
     /// <summary>
-    /// Gets or sets the GPT-3.5 input price per thousand prompt tokens in USD.
+    /// Gets or sets the fallback deployment input price per thousand prompt tokens in USD.
     /// </summary>
     [Range(0D, double.MaxValue)]
-    public double Gpt35InputPerThousand { get; set; }
+    public double FallbackInputPerThousand { get; set; }
 
     /// <summary>
-    /// Gets or sets the GPT-3.5 output price per thousand completion tokens in USD.
+    /// Gets or sets the fallback deployment output price per thousand completion tokens in USD.
     /// </summary>
     [Range(0D, double.MaxValue)]
-    public double Gpt35OutputPerThousand { get; set; }
+    public double FallbackOutputPerThousand { get; set; }
 }

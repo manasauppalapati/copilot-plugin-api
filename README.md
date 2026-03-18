@@ -24,7 +24,7 @@ A production-grade Copilot-style conversational API built in C# / .NET 8 with Az
        F --> G[Prompt Builder<br/>System + history + query · token budget enforced]
        G --> H[LLM Orchestrator<br/>Retry + exponential backoff · graceful degradation]
        H -->|GPT-4o healthy| I[Azure OpenAI GPT-4o]
-       H -->|GPT-4o throttled| J[Azure OpenAI GPT-3.5-turbo<br/>~10x cheaper fallback]
+       H -->|GPT-4o throttled| J[Azure OpenAI GPT-4o-mini<br/>lower-cost fallback]
        H -->|both fail| Z5[degraded: true · partial response]
        I --> K[Response Formatter<br/>SSE streaming · JSON fallback]
        J --> K
@@ -36,7 +36,7 @@ A production-grade Copilot-style conversational API built in C# / .NET 8 with Az
 - **Context-aware memory**: Redis-backed session history capped at 20 turns with 24h TTL and dynamic token trimming. This prevents unbounded Redis growth and keeps prompts within the model context window.
 - **Semantic caching**: Prompt hash lookup in Redis before every LLM call. This eliminates redundant inference calls and directly reduces token cost.
 - **Idempotent request handling**: SHA-256 keyed deduplication with 60s TTL. This handles network retries and client double-submits without duplicate LLM calls.
-- **Graceful degradation**: LLM orchestrator retries GPT-4o with exponential backoff, falls back to GPT-3.5-turbo, and returns a partial response if both fail. The service does not return a hard 500 during normal throttling and dependency failure paths.
+- **Graceful degradation**: LLM orchestrator retries GPT-4o with exponential backoff, falls back to GPT-4o-mini, and returns a partial response if both fail. The service does not return a hard 500 during normal throttling and dependency failure paths.
 - **Cost visibility**: Every request logs token count, model used, and a cost estimate to SQL. This enables cost-per-user analysis and cache hit rate tracking over time.
 
 ## Tech Stack
@@ -45,7 +45,7 @@ A production-grade Copilot-style conversational API built in C# / .NET 8 with Az
 | Runtime | .NET 8 (C#) — current LTS, Microsoft-native |
 | Web framework | ASP.NET Core Minimal API + Controllers |
 | LLM primary | Azure OpenAI — GPT-4o (gpt-4o deployment name) |
-| LLM fallback | Azure OpenAI — GPT-3.5-turbo (~10x cheaper) |
+| LLM fallback | Azure OpenAI — GPT-4o-mini (lower-cost fallback) |
 | Cache / memory | Redis 7 via StackExchange.Redis |
 | Audit database | SQLite (local dev) / PostgreSQL (prod-ready) |
 | ORM | Entity Framework Core 8 |
@@ -57,39 +57,31 @@ A production-grade Copilot-style conversational API built in C# / .NET 8 with Az
 ## Prerequisites
 - .NET 8 SDK
 - Docker and docker-compose
-- Azure OpenAI resource with `gpt-4o` and `gpt-35-turbo` deployments
+- Azure OpenAI resource with `gpt-4o` and `gpt-4o-mini` deployments
 
 ## Local Setup
-1. Clone the repository.
-   ```bash
-   git clone https://github.com/manasauppalapati/copilot-plugin-api.git
-   cd copilot-plugin-api
-   ```
-2. Copy the development settings file.
-   ```bash
-   cp appsettings.Development.json.example appsettings.Development.json
-   ```
-3. Open `appsettings.Development.json` and populate the following fields:
-   `AzureOpenAI.Endpoint` — your Azure OpenAI resource endpoint
-   `AzureOpenAI.ApiKey` — your Azure OpenAI API key
-   Note: in production, these are supplied as environment variables.
-4. Start Redis and PostgreSQL.
-   ```bash
-   docker-compose up -d
-   ```
-5. Apply the database migrations.
-   ```bash
-   dotnet ef database update
-   ```
-6. Run the API.
-   ```bash
-   dotnet run --project src/
-   ```
+
+```bash
+cp .env.example .env
+# Open .env and fill in:
+#   AzureOpenAI__ApiKey   — your Azure OpenAI API key
+#   AzureOpenAI__Endpoint — your Azure OpenAI endpoint URI
+#   AzureOpenAI__PrimaryDeployment=gpt-4o
+#   AzureOpenAI__FallbackDeployment=gpt-4o-mini
+
+docker-compose up -d
+dotnet run --project src/
+```
+
+Four commands. That is the entire local setup.
+
+> **Production note:** In production, supply environment variables directly through
+> your orchestrator (Kubernetes, Azure App Service, etc.) — do not deploy a `.env` file.
 
 ## API Usage
 Request:
 ```bash
-curl -X POST http://localhost:5000/api/chat \
+curl -X POST http://localhost:8080/api/chat \
   -H "Content-Type: application/json" \
   -d '{
     "userId": "user-123",
@@ -127,31 +119,46 @@ Content-Type: application/json
 ## Environment Variables
 | Variable | Required | Description |
 | --- | --- | --- |
-| `AZURE_OPENAI_API_KEY` | Yes | Authenticates requests to the Azure OpenAI resource. |
-| `AZURE_OPENAI_ENDPOINT` | Yes | Specifies the Azure OpenAI endpoint URI for the configured resource. |
-| `DATABASE_PROVIDER` | No | Selects the SQL provider. Supported values are `sqlite` and `postgresql`. |
+| `AzureOpenAI__ApiKey` | Yes | Authenticates requests to the Azure OpenAI resource. Maps to `AzureOpenAI:ApiKey` via the ASP.NET Core double-underscore convention. |
+| `AzureOpenAI__Endpoint` | Yes | Specifies the Azure OpenAI endpoint URI. Maps to `AzureOpenAI:Endpoint`. |
+| `AzureOpenAI__PrimaryDeployment` | No | Overrides the primary deployment name from `appsettings.json`. Defaults to `gpt-4o`. |
+| `AzureOpenAI__FallbackDeployment` | No | Overrides the fallback deployment name from `appsettings.json`. Defaults to `gpt-4o-mini`. |
+| `DATABASE_PROVIDER` | No | Selects the SQL provider. Supported values are `sqlite` and `postgresql`. Defaults to `sqlite`. |
 | `DATABASE_CONNECTION_STRING` | Yes | Supplies the SQLite or PostgreSQL connection string used by Entity Framework Core. |
+| `Redis__ConnectionString` | No | Overrides the Redis connection string from `appsettings.json`. Defaults to `localhost:6379`. |
+| `ASPNETCORE_ENVIRONMENT` | No | Sets the hosting environment. Use `Development` locally, `Production` in deployment. |
+| `ASPNETCORE_URLS` | No | Sets the listen address. Defaults to `http://+:8080` in Docker. |
 
 ## Project Structure
 ```text
 copilot-plugin-api/
 ├── src/
+│   ├── Configuration/
+│   │   ├── AzureOpenAIConfig.cs
+│   │   ├── CostsConfig.cs
+│   │   ├── MemoryConfig.cs
+│   │   ├── PromptConfig.cs
+│   │   ├── RateLimitConfig.cs
+│   │   ├── RedisConfig.cs
+│   │   └── SemanticCacheConfig.cs
 │   ├── Controllers/
 │   │   └── CopilotController.cs
-│   ├── Services/
-│   │   ├── MemoryService.cs
-│   │   ├── SemanticCacheService.cs
-│   │   ├── PromptBuilderService.cs
-│   │   ├── LlmOrchestratorService.cs
-│   │   ├── RateLimiterService.cs
-│   │   └── IdempotencyService.cs
-│   ├── Models/
-│   │   ├── ChatRequest.cs
-│   │   ├── ChatResponse.cs
-│   │   └── ConversationTurn.cs
 │   ├── Data/
 │   │   ├── AppDbContext.cs
 │   │   └── AuditLogger.cs
+│   ├── Models/
+│   │   ├── ChatRequest.cs
+│   │   ├── ChatResponse.cs
+│   │   ├── ConversationTurn.cs
+│   │   └── LlmResult.cs
+│   ├── Services/
+│   │   ├── IdempotencyService.cs
+│   │   ├── LlmOrchestratorService.cs
+│   │   ├── MemoryService.cs
+│   │   ├── PromptBuilderService.cs
+│   │   ├── RateLimiterService.cs
+│   │   └── SemanticCacheService.cs
+│   ├── CopilotPluginApi.csproj
 │   └── Program.cs
 ├── tests/
 │   └── CopilotApi.Tests/
@@ -159,10 +166,13 @@ copilot-plugin-api/
 │       ├── IdempotencyTests.cs
 │       ├── MemoryServiceTests.cs
 │       └── LlmOrchestratorTests.cs
+├── .dockerignore
+├── .env.example
+├── .gitignore
 ├── Dockerfile
 ├── docker-compose.yml
 ├── appsettings.json
-├── appsettings.Development.json
+├── CopilotPluginApi.sln
 └── README.md
 ```
 

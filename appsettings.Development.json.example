@@ -3,7 +3,7 @@
     "Endpoint": "<your-azure-openai-endpoint>",
     "ApiKey": "<your-azure-openai-api-key>",
     "PrimaryDeployment": "gpt-4o",
-    "FallbackDeployment": "gpt-35-turbo",
+    "FallbackDeployment": "gpt-4o-mini",
     "MaxRetries": 3
   },
   "Prompt": {
@@ -24,10 +24,10 @@
     "RequestsPerMinute": 100
   },
   "Costs": {
-    "Gpt4oInputPerThousand": 0.005,
-    "Gpt4oOutputPerThousand": 0.015,
-    "Gpt35InputPerThousand": 0.0005,
-    "Gpt35OutputPerThousand": 0.0015
+    "PrimaryInputPerThousand": 0.005,
+    "PrimaryOutputPerThousand": 0.015,
+    "FallbackInputPerThousand": 0.0005,
+    "FallbackOutputPerThousand": 0.0015
   },
   "Logging": {
     "LogLevel": {
