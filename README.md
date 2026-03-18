@@ -69,9 +69,10 @@ A production-grade Copilot-style conversational API built in C# / .NET 8 with Az
    ```bash
    cp appsettings.Development.json.example appsettings.Development.json
    ```
-3. Open appsettings.Development.json and populate the following fields:
-   AZURE_OPENAI_API_KEY — your Azure OpenAI API key
-   AZURE_OPENAI_ENDPOINT — your Azure OpenAI resource endpoint URI
+3. Open `appsettings.Development.json` and populate the following fields:
+   `AzureOpenAI.Endpoint` — your Azure OpenAI resource endpoint
+   `AzureOpenAI.ApiKey` — your Azure OpenAI API key
+   Note: in production, these are supplied as environment variables.
 4. Start Redis and PostgreSQL.
    ```bash
    docker-compose up -d

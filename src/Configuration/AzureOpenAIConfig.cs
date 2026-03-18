@@ -24,6 +24,12 @@ public sealed class AzureOpenAIConfig
     public string Endpoint { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the Azure OpenAI API key.
+    /// </summary>
+    [Required]
+    public string ApiKey { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the primary deployment name used for normal traffic.
     /// </summary>
     [Required]
